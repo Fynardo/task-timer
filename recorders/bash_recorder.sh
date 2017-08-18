@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Usage:
-# timer.sh <task>
+# recorder.sh <task>
 if [[ ! $1 ]]
   then
-    echo 'Usage: timer.sh <task>'
+    echo 'Usage: recorder.sh <task>'
     exit
 fi
 
