@@ -60,7 +60,7 @@ void set_timer(){
 /*** LCD Related Functions ***/
 void init_lcd(){
  lcd.begin(16, 2);
- lcd.print("task-timer v0.1");
+ lcd.print("task-timer v0.2");
 }
 
 void update_lcd(String text, unsigned long seconds){
@@ -95,6 +95,7 @@ void set_stop(){
   init_lcd();
   complete_task();
   current_task = "";
+  alarm_ticks = 0;
   digitalWrite(FREE_LED, LOW);
   digitalWrite(ALARM_LED, LOW);
 }
