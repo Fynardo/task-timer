@@ -5,12 +5,17 @@ String current_task = "";
 unsigned long task_ticks = 0;
 
 /*** Work / Free time timer variables ***/
-boolean state = true; //true = working / false = freetime
+#define STOP 0
+#define PAUSE 1
+#define WORK 2
+#define FREE 3
+byte state = STOP;
+
 const byte SWITCH = 11;
-const short ALARM_TRIGGER = 7200; // 2 hours working time
+const short ALARM_TRIGGER = 7200; //7200 seconds = 2 hours working time
 const byte ALARM_LED = 13;
 unsigned long alarm_ticks = 0;
-const short FREE_TRIGGER = 900; // 15 min free time
+const short FREE_TRIGGER = 900; //900 seconds = 15 min free time
 const byte FREE_LED = 12;
 unsigned long free_ticks = 0;
 
@@ -24,24 +29,23 @@ boolean string_complete = false;
 
 /*** Timer 1 Functions ***/
 ISR(TIMER1_COMPA_vect){
-  if (current_task != ""){ //Don't update unless working on something
-    if (state){
+  if (state == WORK){
+      task_ticks++;
+      update_lcd(current_task, task_ticks);
       alarm_ticks++;
       if (alarm_ticks == ALARM_TRIGGER)
         digitalWrite(ALARM_LED, HIGH);
-    }
-    else{
+  }
+  if (state == FREE){
       free_ticks++;
+      update_lcd("FREETIME", free_ticks);
       if (free_ticks == FREE_TRIGGER)
         digitalWrite(FREE_LED, HIGH);
-    }
-    task_ticks++;
-    update_lcd();
   }
 }
 
-//set timer1 interrupt at 1Hz
 void set_timer(){
+  //sets timer1 interrupt at 1Hz
   cli();
   TCCR1A = 0;
   TCCR1B = 0;
@@ -56,32 +60,74 @@ void set_timer(){
 /*** LCD Related Functions ***/
 void init_lcd(){
  lcd.begin(16, 2);
- lcd.print("task-timer v0.1");
+ lcd.print("task-timer v0.2");
 }
 
-void update_lcd(){
+void update_lcd(String text, unsigned long seconds){
   lcd.clear();
   lcd.setCursor(0,0);
-  lcd.print(current_task);
+  lcd.print(text);
   lcd.setCursor(0,1);
-  lcd.print(task_ticks/3600);
+  lcd.print(seconds/3600);
   lcd.setCursor(2,1);
   lcd.print(":");
-  lcd.print((task_ticks/60)%60);
+  lcd.print((seconds/60)%60);
   lcd.setCursor(5,1);
   lcd.print(":");
-  lcd.print(task_ticks%60);
+  lcd.print(seconds%60);
   lcd.setCursor(8,1);
 }
 
 /*** General Functions ***/
 void complete_task(){
+  //Send task information over serial and resets timer
   if (current_task != ""){
     Serial.print(current_task);
     Serial.print("-");
     Serial.println(task_ticks);
     task_ticks = 0;
   } 
+}
+
+void set_stop(){
+  //Set STOP state
+  state = STOP;
+  init_lcd();
+  complete_task();
+  current_task = "";
+  alarm_ticks = 0;
+  digitalWrite(FREE_LED, LOW);
+  digitalWrite(ALARM_LED, LOW);
+}
+
+void set_pause(){
+  //Set PAUSE state
+  state = PAUSE;
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print(current_task);
+  lcd.setCursor(0,1);
+  lcd.print("PAUSED");
+}
+
+void unset_pause(){
+  //Unset pause state
+  state = WORK;
+}
+
+void set_free(){
+  //Set FREE state with timer
+  alarm_ticks = 0;
+  digitalWrite(ALARM_LED, LOW);
+  state = FREE;
+  update_lcd("FREETIME", free_ticks);
+}
+
+void unset_free(){
+  //Unset FREE state
+  free_ticks = 0;
+  digitalWrite(FREE_LED, LOW);
+  state = WORK;
 }
 
 void setup() {
@@ -111,29 +157,32 @@ void serialEvent() {
 void loop(){
   if (string_complete) {
     // Command from serial
-    complete_task();
-    current_task = input_string;
+    if (input_string == ","){
+      if (state == PAUSE) 
+        unset_pause();
+      else
+        set_pause();
+    }
+    else if (input_string == "."){
+      set_stop();
+    }
+    else {
+      complete_task();
+      current_task = input_string;
+      update_lcd(current_task, 0);
+      state = WORK;
+    }
     input_string = "";
     string_complete = false;
-    update_lcd();
   }
-  if (digitalRead(SWITCH) == HIGH && state) {
+  if ((digitalRead(SWITCH) == HIGH) && (state == WORK) ) {
     // Going to free time
-    alarm_ticks = 0;
-    digitalWrite(ALARM_LED, LOW);
-    state = !state;
-    complete_task();
-    current_task = "freetime";
+    set_free();
     delay(500);
   }
-  if (digitalRead(SWITCH) == HIGH && !state){
+  if ((digitalRead(SWITCH) == HIGH) && (state == FREE) ){
     // Coming back from free time
-    free_ticks = 0;
-    digitalWrite(FREE_LED, LOW);
-    state = !state;
-    complete_task();
-    current_task = "";
-    init_lcd();
+    unset_free();
     delay(500);
   }
 }
