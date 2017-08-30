@@ -1,6 +1,7 @@
 # task-timer
 Arduino powered task timer with work time / free time alert
 
+[**v0.2 Patch Log**](https://fynardo.github.io/arduino/2017/08/22/arduino-task-timer-v02.html)
 
 ## Structure
 
